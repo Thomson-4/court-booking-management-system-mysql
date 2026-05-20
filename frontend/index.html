@@ -3,45 +3,52 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Court Booking System</title>
+  <title>CourtBook — Sports Court Booking</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+
+  <!-- Toast Container -->
+  <div id="toast-container"></div>
+
+  <!-- Navbar -->
   <nav id="navbar" class="hidden">
-    <div class="nav-brand">CourtBook</div>
-    <div class="nav-links">
-      <a href="#" onclick="showPage('courts')">Courts</a>
-      <a href="#" onclick="showPage('my-bookings')">My Bookings</a>
-      <a href="#" onclick="showPage('wallet')">Wallet <span id="nav-balance"></span></a>
-      <a href="#" id="admin-link" class="hidden" onclick="showPage('admin')">Admin</a>
+    <div class="nav-left">
+      <div class="nav-brand">CourtBook</div>
+    </div>
+    <div class="nav-links" id="nav-links">
+      <a href="#" onclick="showPage('courts'); closeMenu()">Courts</a>
+      <a href="#" onclick="showPage('my-bookings'); closeMenu()">My Bookings</a>
+      <a href="#" onclick="showPage('wallet'); closeMenu()">Wallet <span id="nav-balance"></span></a>
+      <a href="#" onclick="showPage('profile'); closeMenu()">Profile</a>
+      <a href="#" id="admin-link" class="hidden" onclick="showPage('admin'); closeMenu()">Admin</a>
       <a href="#" onclick="logout()" class="btn-logout">Logout</a>
     </div>
-    <div class="nav-user">Hi, <span id="nav-username"></span></div>
+    <button class="hamburger" id="hamburger" onclick="toggleMenu()">
+      <span></span><span></span><span></span>
+    </button>
   </nav>
 
   <!-- Auth Page -->
-  <div id="page-auth" class="page">
+  <div id="page-auth" class="page active">
     <div class="auth-container">
       <div class="auth-box">
+        <div class="auth-logo">🏸</div>
         <h1>CourtBook</h1>
         <p class="subtitle">Sports Court Booking System</p>
         <div class="tab-row">
-          <button class="tab active" onclick="switchTab('login')">Login</button>
-          <button class="tab" onclick="switchTab('register')">Register</button>
+          <button class="tab active" onclick="switchTab('login', event)">Login</button>
+          <button class="tab" onclick="switchTab('register', event)">Register</button>
         </div>
-        <div id="auth-error" class="alert error hidden"></div>
-        <div id="auth-success" class="alert success hidden"></div>
-
         <form id="login-form" onsubmit="login(event)">
-          <input type="text" id="login-username" placeholder="Username" required />
-          <input type="password" id="login-password" placeholder="Password" required />
-          <button type="submit" class="btn-primary">Login</button>
+          <input type="text" id="login-username" placeholder="Username" required autocomplete="username" />
+          <input type="password" id="login-password" placeholder="Password" required autocomplete="current-password" />
+          <button type="submit" class="btn-primary" id="login-btn">Login</button>
         </form>
-
         <form id="register-form" class="hidden" onsubmit="register(event)">
-          <input type="text" id="reg-username" placeholder="Username" required />
-          <input type="password" id="reg-password" placeholder="Password (min 6 chars)" required />
-          <button type="submit" class="btn-primary">Create Account</button>
+          <input type="text" id="reg-username" placeholder="Username" required autocomplete="username" />
+          <input type="password" id="reg-password" placeholder="Password (min 6 chars)" required autocomplete="new-password" />
+          <button type="submit" class="btn-primary" id="reg-btn">Create Account</button>
         </form>
       </div>
     </div>
@@ -53,12 +60,18 @@
       <div class="page-header">
         <h2>Available Courts</h2>
         <div class="filters">
+          <div class="search-wrap">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="search-courts" placeholder="Search courts..." oninput="filterCourts()" />
+          </div>
           <select id="filter-sport" onchange="filterCourts()">
             <option value="">All Sports</option>
             <option value="Badminton">Badminton</option>
             <option value="Tennis">Tennis</option>
             <option value="Football">Football</option>
             <option value="Basketball">Basketball</option>
+            <option value="Cricket">Cricket</option>
+            <option value="Volleyball">Volleyball</option>
           </select>
         </div>
       </div>
@@ -77,11 +90,10 @@
           <label>Date</label>
           <input type="date" id="booking-date" onchange="loadSlots()" />
         </div>
-        <div id="slots-container" class="slots-container hidden">
+        <div id="slots-container" class="hidden">
           <h4>Available Time Slots</h4>
           <div id="slots-grid" class="slots-grid"></div>
-          <div id="booking-error" class="alert error hidden"></div>
-          <button class="btn-primary" id="confirm-btn" onclick="confirmBooking()" disabled>Confirm Booking</button>
+          <button class="btn-primary" id="confirm-btn" onclick="openConfirmModal()" disabled>Confirm Booking</button>
         </div>
       </div>
     </div>
@@ -91,6 +103,11 @@
   <div id="page-my-bookings" class="page hidden">
     <div class="container">
       <h2>My Bookings</h2>
+      <div class="bookings-tabs">
+        <button class="tab active" onclick="filterBookings('all', event)">All</button>
+        <button class="tab" onclick="filterBookings('confirmed', event)">Confirmed</button>
+        <button class="tab" onclick="filterBookings('cancelled', event)">Cancelled</button>
+      </div>
       <div id="bookings-list"></div>
     </div>
   </div>
@@ -102,20 +119,38 @@
       <div class="wallet-card">
         <div class="wallet-label">Current Balance</div>
         <div class="wallet-amount" id="wallet-balance">₹0.00</div>
+        <div class="wallet-username" id="wallet-username"></div>
       </div>
-      <div class="add-money-box">
-        <h3>Add Money</h3>
-        <div class="quick-amounts">
-          <button onclick="setAmount(100)">₹100</button>
-          <button onclick="setAmount(200)">₹200</button>
-          <button onclick="setAmount(500)">₹500</button>
-          <button onclick="setAmount(1000)">₹1000</button>
+      <div class="wallet-body">
+        <div class="add-money-box">
+          <h3>Add Money</h3>
+          <div class="quick-amounts">
+            <button onclick="setAmount(100)">₹100</button>
+            <button onclick="setAmount(200)">₹200</button>
+            <button onclick="setAmount(500)">₹500</button>
+            <button onclick="setAmount(1000)">₹1000</button>
+          </div>
+          <input type="number" id="wallet-amount" placeholder="Or enter custom amount" min="1" />
+          <button class="btn-primary" onclick="addMoney()">Add Money</button>
         </div>
-        <input type="number" id="wallet-amount" placeholder="Or enter custom amount" min="1" />
-        <div id="wallet-error" class="alert error hidden"></div>
-        <div id="wallet-success" class="alert success hidden"></div>
-        <button class="btn-primary" onclick="addMoney()">Add Money</button>
+        <div class="txn-box">
+          <h3>Transaction History</h3>
+          <div id="txn-list"></div>
+        </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Profile Page -->
+  <div id="page-profile" class="page hidden">
+    <div class="container profile-container">
+      <h2>My Profile</h2>
+      <div class="profile-card">
+        <div class="profile-avatar" id="profile-avatar"></div>
+        <div class="profile-name" id="profile-name"></div>
+        <div class="profile-role" id="profile-role"></div>
+      </div>
+      <div class="profile-stats" id="profile-stats"></div>
     </div>
   </div>
 
@@ -124,10 +159,9 @@
     <div class="container">
       <h2>Admin Panel</h2>
       <div class="admin-tabs">
-        <button class="tab active" onclick="switchAdminTab('courts')">Manage Courts</button>
-        <button class="tab" onclick="switchAdminTab('bookings')">All Bookings</button>
+        <button class="tab active" onclick="switchAdminTab('courts', event)">Manage Courts</button>
+        <button class="tab" onclick="switchAdminTab('bookings', event)">All Bookings</button>
       </div>
-
       <div id="admin-courts">
         <div class="admin-section-header">
           <h3>Courts</h3>
@@ -135,10 +169,34 @@
         </div>
         <div id="admin-courts-list"></div>
       </div>
-
       <div id="admin-bookings" class="hidden">
         <h3>All Bookings</h3>
         <div id="admin-bookings-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 404 Page -->
+  <div id="page-404" class="page hidden">
+    <div class="not-found">
+      <div class="not-found-icon">🏟️</div>
+      <h2>Page Not Found</h2>
+      <p>Looks like this court doesn't exist.</p>
+      <button class="btn-primary" onclick="showPage('courts')" style="width:auto;padding:0.7rem 2rem;margin-top:1rem">Back to Courts</button>
+    </div>
+  </div>
+
+  <!-- Booking Confirmation Modal -->
+  <div id="confirm-modal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Confirm Booking</h3>
+        <button class="modal-close" onclick="closeConfirmModal()">×</button>
+      </div>
+      <div class="confirm-summary" id="confirm-summary"></div>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeConfirmModal()">Cancel</button>
+        <button class="btn-primary" onclick="confirmBooking()" style="width:auto;padding:0.65rem 1.5rem">Confirm & Pay</button>
       </div>
     </div>
   </div>
@@ -176,7 +234,7 @@
         </select>
         <div class="modal-actions">
           <button type="button" class="btn-secondary" onclick="closeCourtModal()">Cancel</button>
-          <button type="submit" class="btn-primary">Save</button>
+          <button type="submit" class="btn-primary" style="width:auto;padding:0.65rem 1.5rem">Save</button>
         </div>
       </form>
     </div>

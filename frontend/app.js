@@ -8,106 +8,114 @@ let state = {
   walletBalance: parseFloat(localStorage.getItem('walletBalance') || '0'),
   selectedCourt: null,
   selectedSlot: null,
-  currentPage: null,
+  allBookings: [],
 };
 
-// ─── INIT ────────────────────────────────────────────────────────────────────
+// ── INIT ──────────────────────────────────────────────────────
 window.onload = () => {
-  if (state.token) {
-    showApp();
-    showPage('courts');
-  } else {
-    showPage('auth');
-  }
+  if (state.token) { showApp(); showPage('courts'); }
+  else showPage('auth');
 };
 
 function showApp() {
   document.getElementById('navbar').classList.remove('hidden');
-  document.getElementById('nav-username').textContent = state.username;
+  document.getElementById('nav-username') && (document.getElementById('nav-username').textContent = state.username);
   if (state.role === 'admin') document.getElementById('admin-link').classList.remove('hidden');
   updateNavBalance();
 }
 
 function updateNavBalance() {
-  document.getElementById('nav-balance').textContent = `₹${parseFloat(state.walletBalance).toFixed(2)}`;
+  const el = document.getElementById('nav-balance');
+  if (el) el.textContent = `₹${parseFloat(state.walletBalance).toFixed(2)}`;
 }
 
-// ─── PAGES ───────────────────────────────────────────────────────────────────
+// ── PAGES ─────────────────────────────────────────────────────
 function showPage(page) {
-  document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
-  document.getElementById(`page-${page}`).classList.remove('hidden');
-  state.currentPage = page;
+  document.querySelectorAll('.page').forEach(p => { p.classList.remove('active'); p.classList.add('hidden'); });
+  const el = document.getElementById(`page-${page}`);
+  if (!el) { showPage('404'); return; }
+  el.classList.remove('hidden');
+  el.classList.add('active');
+  closeMenu();
 
-  if (page === 'courts') loadCourts();
+  if (page === 'courts')      loadCourts();
   if (page === 'my-bookings') loadMyBookings();
-  if (page === 'wallet') loadWallet();
-  if (page === 'admin') loadAdmin();
+  if (page === 'wallet')      loadWallet();
+  if (page === 'admin')       loadAdmin();
+  if (page === 'profile')     loadProfile();
 }
 
-// ─── AUTH ────────────────────────────────────────────────────────────────────
-function switchTab(tab) {
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  event.target.classList.add('active');
+// ── TOAST ─────────────────────────────────────────────────────
+function toast(msg, type = 'info', duration = 3500) {
+  const c = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(() => {
+    t.style.animation = 'slideOut 0.3s ease forwards';
+    setTimeout(() => t.remove(), 300);
+  }, duration);
+}
+
+// ── MOBILE NAV ────────────────────────────────────────────────
+function toggleMenu() {
+  document.getElementById('nav-links').classList.toggle('open');
+}
+function closeMenu() {
+  document.getElementById('nav-links')?.classList.remove('open');
+}
+
+// ── AUTH ──────────────────────────────────────────────────────
+function switchTab(tab, e) {
+  document.querySelectorAll('.tab-row .tab').forEach(t => t.classList.remove('active'));
+  e.target.classList.add('active');
   document.getElementById('login-form').classList.toggle('hidden', tab !== 'login');
   document.getElementById('register-form').classList.toggle('hidden', tab !== 'register');
-  hideAuthMessages();
-}
-
-function hideAuthMessages() {
-  document.getElementById('auth-error').classList.add('hidden');
-  document.getElementById('auth-success').classList.add('hidden');
 }
 
 async function login(e) {
   e.preventDefault();
-  hideAuthMessages();
+  const btn = document.getElementById('login-btn');
+  btn.textContent = 'Logging in...'; btn.disabled = true;
   const username = document.getElementById('login-username').value.trim();
   const password = document.getElementById('login-password').value;
-
   try {
     const res = await fetch(`${API}/auth/login`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password })
     });
     const data = await res.json();
-    if (!res.ok) return showError('auth-error', data.error);
-
+    if (!res.ok) { toast(data.error, 'error'); return; }
     saveSession(data);
     showApp();
     showPage('courts');
-  } catch {
-    showError('auth-error', 'Connection failed. Is the server running?');
-  }
+    toast(`Welcome back, ${data.username}!`, 'success');
+  } catch { toast('Connection failed. Is the server running?', 'error'); }
+  finally { btn.textContent = 'Login'; btn.disabled = false; }
 }
 
 async function register(e) {
   e.preventDefault();
-  hideAuthMessages();
+  const btn = document.getElementById('reg-btn');
+  btn.textContent = 'Creating...'; btn.disabled = true;
   const username = document.getElementById('reg-username').value.trim();
   const password = document.getElementById('reg-password').value;
-
   try {
     const res = await fetch(`${API}/auth/register`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password })
     });
     const data = await res.json();
-    if (!res.ok) return showError('auth-error', data.error);
-
-    document.getElementById('auth-success').textContent = 'Account created! You can now login.';
-    document.getElementById('auth-success').classList.remove('hidden');
+    if (!res.ok) { toast(data.error, 'error'); return; }
+    toast('Account created! You can now login.', 'success');
     document.getElementById('register-form').reset();
-  } catch {
-    showError('auth-error', 'Connection failed. Is the server running?');
-  }
+  } catch { toast('Connection failed.', 'error'); }
+  finally { btn.textContent = 'Create Account'; btn.disabled = false; }
 }
 
 function saveSession(data) {
-  state.token = data.token;
-  state.userId = data.userId;
-  state.role = data.role;
-  state.username = data.username;
-  state.walletBalance = data.walletBalance || 0;
+  Object.assign(state, { token: data.token, userId: data.userId, role: data.role, username: data.username, walletBalance: data.walletBalance || 0 });
   localStorage.setItem('token', data.token);
   localStorage.setItem('userId', data.userId);
   localStorage.setItem('role', data.role);
@@ -120,35 +128,44 @@ function logout() {
   location.reload();
 }
 
-// ─── COURTS ──────────────────────────────────────────────────────────────────
+// ── COURTS ────────────────────────────────────────────────────
 let allCourts = [];
+
+function skeletonCards(n = 6) {
+  return Array(n).fill(0).map(() => `
+    <div class="skeleton-card">
+      <div class="skeleton sk-title"></div>
+      <div class="skeleton sk-badge"></div>
+      <div class="skeleton sk-line"></div>
+      <div class="skeleton sk-line sk-short"></div>
+    </div>`).join('');
+}
 
 async function loadCourts() {
   const grid = document.getElementById('courts-grid');
-  grid.innerHTML = '<p style="color:var(--muted)">Loading courts...</p>';
+  grid.innerHTML = skeletonCards();
   try {
     const res = await fetch(`${API}/courts`);
     allCourts = await res.json();
-    renderCourts(allCourts);
-  } catch {
-    grid.innerHTML = '<p style="color:var(--danger)">Failed to load courts.</p>';
-  }
+    filterCourts();
+  } catch { grid.innerHTML = '<p style="color:var(--danger)">Failed to load courts.</p>'; }
 }
 
 function filterCourts() {
-  const sport = document.getElementById('filter-sport').value;
-  const filtered = sport ? allCourts.filter(c => c.sport === sport) : allCourts;
+  const sport  = document.getElementById('filter-sport').value;
+  const search = document.getElementById('search-courts').value.toLowerCase();
+  const filtered = allCourts.filter(c =>
+    (!sport  || c.sport === sport) &&
+    (!search || c.name.toLowerCase().includes(search) || c.sport.toLowerCase().includes(search) || c.address.toLowerCase().includes(search))
+  );
   renderCourts(filtered);
 }
 
 function renderCourts(courts) {
   const grid = document.getElementById('courts-grid');
-  if (!courts.length) {
-    grid.innerHTML = '<p style="color:var(--muted)">No courts found.</p>';
-    return;
-  }
+  if (!courts.length) { grid.innerHTML = '<p style="color:var(--muted);grid-column:1/-1">No courts match your search.</p>'; return; }
   grid.innerHTML = courts.map(c => `
-    <div class="court-card" onclick="openBooking(${c.id})">
+    <div class="court-card" onclick="${c.status === 'unavailable' ? '' : `openBooking(${c.id})`}" style="${c.status === 'unavailable' ? 'opacity:0.6;cursor:default' : ''}">
       <h3>${c.name}</h3>
       <div class="sport-badge sport-${c.sport}">${c.sport}</div>
       <p class="court-address">📍 ${c.address}</p>
@@ -156,20 +173,15 @@ function renderCourts(courts) {
       <p class="${c.status === 'available' ? 'status-available' : 'status-unavailable'}">
         ${c.status === 'available' ? '✓ Available' : '✗ Unavailable'}
       </p>
-    </div>
-  `).join('');
+    </div>`).join('');
 }
 
-// ─── BOOKING ─────────────────────────────────────────────────────────────────
-const TIME_SLOTS = [
-  '06:00', '07:00', '08:00', '09:00', '10:00', '11:00',
-  '12:00', '13:00', '14:00', '15:00', '16:00', '17:00',
-  '18:00', '19:00', '20:00', '21:00'
-];
+// ── BOOKING ───────────────────────────────────────────────────
+const TIME_SLOTS = ['06:00','07:00','08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00'];
 
 function openBooking(courtId) {
   const court = allCourts.find(c => c.id === courtId);
-  if (!court || court.status === 'unavailable') return;
+  if (!court) return;
   state.selectedCourt = court;
   state.selectedSlot = null;
 
@@ -182,15 +194,13 @@ function openBooking(courtId) {
         <div class="detail-item">💰 <strong>₹${parseFloat(court.rate_per_hour).toFixed(2)}/hour</strong></div>
         <div class="detail-item">💳 Your balance: <strong>₹${parseFloat(state.walletBalance).toFixed(2)}</strong></div>
       </div>
-    </div>
-  `;
+    </div>`;
 
   const today = new Date().toISOString().split('T')[0];
   document.getElementById('booking-date').min = today;
   document.getElementById('booking-date').value = today;
   document.getElementById('slots-container').classList.add('hidden');
   document.getElementById('confirm-btn').disabled = true;
-
   showPage('booking');
   loadSlots();
 }
@@ -200,23 +210,18 @@ async function loadSlots() {
   if (!date) return;
   state.selectedSlot = null;
   document.getElementById('confirm-btn').disabled = true;
+  const grid = document.getElementById('slots-grid');
+  grid.innerHTML = '<p style="color:var(--muted);font-size:0.85rem">Loading slots...</p>';
+  document.getElementById('slots-container').classList.remove('hidden');
 
   try {
     const res = await authFetch(`${API}/bookings?courtId=${state.selectedCourt.id}&date=${date}`);
     const booked = await res.json();
-
-    const grid = document.getElementById('slots-grid');
     grid.innerHTML = TIME_SLOTS.map(t => {
-      const isBooked = booked.includes(t + ':00') || booked.includes(t);
-      return `<div class="slot ${isBooked ? 'booked' : ''}" onclick="${isBooked ? '' : `selectSlot('${t}', this)`}">${t}</div>`;
+      const isBooked = booked.some(b => b.startsWith(t));
+      return `<div class="slot${isBooked ? ' booked' : ''}" ${isBooked ? '' : `onclick="selectSlot('${t}', this)"`}>${t}</div>`;
     }).join('');
-
-    document.getElementById('slots-container').classList.remove('hidden');
-    document.getElementById('booking-error').classList.add('hidden');
-  } catch {
-    document.getElementById('booking-error').textContent = 'Failed to load slots.';
-    document.getElementById('booking-error').classList.remove('hidden');
-  }
+  } catch { grid.innerHTML = '<p style="color:var(--danger)">Failed to load slots.</p>'; }
 }
 
 function selectSlot(time, el) {
@@ -226,16 +231,35 @@ function selectSlot(time, el) {
   document.getElementById('confirm-btn').disabled = false;
 }
 
-async function confirmBooking() {
-  const date = document.getElementById('booking-date').value;
-  const errEl = document.getElementById('booking-error');
-  errEl.classList.add('hidden');
+function openConfirmModal() {
+  const court = state.selectedCourt;
+  const date  = document.getElementById('booking-date').value;
+  const time  = state.selectedSlot;
 
-  if (parseFloat(state.walletBalance) < parseFloat(state.selectedCourt.rate_per_hour)) {
-    errEl.textContent = `Insufficient balance. Required: ₹${state.selectedCourt.rate_per_hour}. Please top up your wallet.`;
-    errEl.classList.remove('hidden');
+  if (parseFloat(state.walletBalance) < parseFloat(court.rate_per_hour)) {
+    toast(`Insufficient balance. Need ₹${court.rate_per_hour}. Please top up your wallet.`, 'error', 5000);
     return;
   }
+
+  document.getElementById('confirm-summary').innerHTML = `
+    <div class="confirm-row"><span>Court</span><span>${court.name}</span></div>
+    <div class="confirm-row"><span>Sport</span><span>${court.sport}</span></div>
+    <div class="confirm-row"><span>Date</span><span>${formatDate(date)}</span></div>
+    <div class="confirm-row"><span>Time</span><span>${time}</span></div>
+    <div class="confirm-row"><span>Amount to Pay</span><span>₹${parseFloat(court.rate_per_hour).toFixed(2)}</span></div>`;
+
+  document.getElementById('confirm-modal').classList.remove('hidden');
+}
+
+function closeConfirmModal() {
+  document.getElementById('confirm-modal').classList.add('hidden');
+}
+
+async function confirmBooking() {
+  closeConfirmModal();
+  const date = document.getElementById('booking-date').value;
+  const btn  = document.getElementById('confirm-btn');
+  btn.textContent = 'Booking...'; btn.disabled = true;
 
   try {
     const res = await authFetch(`${API}/bookings`, {
@@ -243,96 +267,105 @@ async function confirmBooking() {
       body: JSON.stringify({ courtId: state.selectedCourt.id, date, time: state.selectedSlot + ':00' })
     });
     const data = await res.json();
-    if (!res.ok) {
-      errEl.textContent = data.error || 'Booking failed.';
-      errEl.classList.remove('hidden');
-      return;
-    }
+    if (!res.ok) { toast(data.error || 'Booking failed.', 'error'); return; }
 
     state.walletBalance -= parseFloat(state.selectedCourt.rate_per_hour);
     localStorage.setItem('walletBalance', state.walletBalance);
     updateNavBalance();
-    alert(`Booking confirmed! ₹${data.amount} deducted from your wallet.`);
+    toast(`Booking confirmed! ₹${data.amount} deducted from wallet.`, 'success', 4000);
     loadSlots();
-  } catch {
-    errEl.textContent = 'Booking failed. Please try again.';
-    errEl.classList.remove('hidden');
-  }
+  } catch { toast('Booking failed. Please try again.', 'error'); }
+  finally { btn.textContent = 'Confirm Booking'; btn.disabled = false; }
 }
 
-// ─── MY BOOKINGS ─────────────────────────────────────────────────────────────
+// ── MY BOOKINGS ───────────────────────────────────────────────
 async function loadMyBookings() {
   const list = document.getElementById('bookings-list');
-  list.innerHTML = '<p style="color:var(--muted)">Loading...</p>';
+  list.innerHTML = skeletonCards(3).replace(/courts-grid/g, '').replace(/court-card/g, 'skeleton-card');
+
   try {
     const res = await authFetch(`${API}/bookings/user/${state.userId}`);
-    const bookings = await res.json();
+    state.allBookings = await res.json();
+    renderBookings(state.allBookings);
+  } catch { list.innerHTML = '<p style="color:var(--danger)">Failed to load bookings.</p>'; }
+}
 
-    if (!bookings.length) {
-      list.innerHTML = '<div class="bookings-empty"><p>No bookings yet.</p><p style="margin-top:0.5rem;font-size:0.85rem">Browse courts to make your first booking!</p></div>';
-      return;
-    }
+function filterBookings(status, e) {
+  document.querySelectorAll('.bookings-tabs .tab').forEach(t => t.classList.remove('active'));
+  e.target.classList.add('active');
+  const filtered = status === 'all' ? state.allBookings : state.allBookings.filter(b => b.status === status);
+  renderBookings(filtered);
+}
 
-    list.innerHTML = bookings.map(b => `
-      <div class="booking-item">
-        <div class="booking-info">
-          <h4>${b.name} <span class="sport-badge sport-${b.sport}" style="font-size:0.7rem">${b.sport}</span></h4>
-          <p class="booking-meta">📅 ${formatDate(b.date)} &nbsp;⏰ ${b.time} &nbsp;💰 ₹${b.rate_per_hour || ''}</p>
-        </div>
-        <div style="display:flex;gap:0.8rem;align-items:center">
-          <span class="booking-status status-${b.status}">${b.status}</span>
-          ${b.status === 'confirmed' ? `<button class="btn-cancel" onclick="cancelBooking(${b.id})">Cancel</button>` : ''}
-        </div>
-      </div>
-    `).join('');
-  } catch {
-    list.innerHTML = '<p style="color:var(--danger)">Failed to load bookings.</p>';
+function renderBookings(bookings) {
+  const list = document.getElementById('bookings-list');
+  if (!bookings.length) {
+    list.innerHTML = '<div class="bookings-empty"><p>No bookings found.</p><p style="margin-top:0.5rem;font-size:0.85rem">Browse courts to make your first booking!</p></div>';
+    return;
   }
+  list.innerHTML = bookings.map(b => `
+    <div class="booking-item">
+      <div class="booking-info">
+        <h4>${b.name} <span class="sport-badge sport-${b.sport}" style="font-size:0.7rem">${b.sport}</span></h4>
+        <p class="booking-meta">📅 ${formatDate(b.date)} &nbsp;⏰ ${b.time} &nbsp;💰 ₹${parseFloat(b.rate_per_hour).toFixed(2)}</p>
+      </div>
+      <div style="display:flex;gap:0.8rem;align-items:center;flex-shrink:0">
+        <span class="booking-status status-${b.status}">${b.status}</span>
+        ${b.status === 'confirmed' ? `<button class="btn-cancel" onclick="cancelBooking(${b.id})">Cancel</button>` : ''}
+      </div>
+    </div>`).join('');
 }
 
 async function cancelBooking(id) {
-  if (!confirm('Cancel this booking? The amount will be refunded to your wallet.')) return;
+  if (!confirm('Cancel this booking? Amount will be refunded to your wallet.')) return;
   try {
     const res = await authFetch(`${API}/bookings/${id}/cancel`, { method: 'PATCH' });
     const data = await res.json();
-    if (!res.ok) return alert(data.error || 'Cancellation failed.');
+    if (!res.ok) { toast(data.error || 'Cancellation failed.', 'error'); return; }
     state.walletBalance += parseFloat(data.refundAmount || 0);
     localStorage.setItem('walletBalance', state.walletBalance);
     updateNavBalance();
+    toast(`Booking cancelled. ₹${data.refundAmount} refunded to wallet.`, 'success', 4000);
     loadMyBookings();
-  } catch {
-    alert('Cancellation failed.');
-  }
+  } catch { toast('Cancellation failed.', 'error'); }
 }
 
-// ─── WALLET ──────────────────────────────────────────────────────────────────
+// ── WALLET ────────────────────────────────────────────────────
 async function loadWallet() {
   try {
-    const res = await authFetch(`${API}/wallet/balance`);
-    const data = await res.json();
-    state.walletBalance = data.balance || 0;
+    const [balRes, txnRes] = await Promise.all([
+      authFetch(`${API}/wallet/balance`),
+      authFetch(`${API}/wallet/transactions`)
+    ]);
+    const { balance } = await balRes.json();
+    const txns = await txnRes.json();
+
+    state.walletBalance = balance || 0;
     localStorage.setItem('walletBalance', state.walletBalance);
     updateNavBalance();
     document.getElementById('wallet-balance').textContent = `₹${parseFloat(state.walletBalance).toFixed(2)}`;
+    document.getElementById('wallet-username').textContent = state.username;
+
+    const txnList = document.getElementById('txn-list');
+    if (!txns.length) { txnList.innerHTML = '<p class="txn-empty">No transactions yet.</p>'; return; }
+    txnList.innerHTML = txns.map(t => `
+      <div class="txn-item">
+        <div>
+          <div class="txn-desc">${t.description}</div>
+          <div class="txn-date">${formatDateTime(t.created_at)}</div>
+        </div>
+        <div class="txn-amount txn-${t.type}">
+          ${t.type === 'credit' ? '+' : '-'}₹${parseFloat(t.amount).toFixed(2)}
+        </div>
+      </div>`).join('');
   } catch {}
 }
 
-function setAmount(val) {
-  document.getElementById('wallet-amount').value = val;
-}
+function setAmount(val) { document.getElementById('wallet-amount').value = val; }
 
 async function addMoney() {
   const amount = parseFloat(document.getElementById('wallet-amount').value);
-  const errEl = document.getElementById('wallet-error');
-  const sucEl = document.getElementById('wallet-success');
-  errEl.classList.add('hidden');
-  sucEl.classList.add('hidden');
-
-  if (!amount || amount <= 0) {
-    errEl.textContent = 'Enter a valid amount.';
-    errEl.classList.remove('hidden');
-    return;
-  }
+  if (!amount || amount <= 0) { toast('Enter a valid amount.', 'error'); return; }
 
   try {
     const res = await authFetch(`${API}/wallet/add`, {
@@ -340,36 +373,54 @@ async function addMoney() {
       body: JSON.stringify({ amount })
     });
     const data = await res.json();
-    if (!res.ok) {
-      errEl.textContent = data.error || 'Failed to add money.';
-      errEl.classList.remove('hidden');
-      return;
-    }
+    if (!res.ok) { toast(data.error || 'Failed to add money.', 'error'); return; }
     state.walletBalance = data.newBalance;
     localStorage.setItem('walletBalance', state.walletBalance);
     updateNavBalance();
-    document.getElementById('wallet-balance').textContent = `₹${parseFloat(state.walletBalance).toFixed(2)}`;
     document.getElementById('wallet-amount').value = '';
-    sucEl.textContent = `₹${amount} added successfully!`;
-    sucEl.classList.remove('hidden');
-  } catch {
-    errEl.textContent = 'Failed to add money.';
-    errEl.classList.remove('hidden');
-  }
+    toast(`₹${amount} added to wallet!`, 'success');
+    loadWallet();
+  } catch { toast('Failed to add money.', 'error'); }
 }
 
-// ─── ADMIN ───────────────────────────────────────────────────────────────────
-function switchAdminTab(tab) {
+// ── PROFILE ───────────────────────────────────────────────────
+async function loadProfile() {
+  document.getElementById('profile-avatar').textContent = state.username[0].toUpperCase();
+  document.getElementById('profile-name').textContent = state.username;
+  document.getElementById('profile-role').textContent = state.role === 'admin' ? '👑 Admin' : '👤 User';
+
+  try {
+    const [bookRes, balRes] = await Promise.all([
+      authFetch(`${API}/bookings/user/${state.userId}`),
+      authFetch(`${API}/wallet/balance`)
+    ]);
+    const bookings = await bookRes.json();
+    const { balance } = await balRes.json();
+
+    const confirmed  = bookings.filter(b => b.status === 'confirmed').length;
+    const cancelled  = bookings.filter(b => b.status === 'cancelled').length;
+    const totalSpent = bookings.filter(b => b.status === 'confirmed').reduce((s, b) => s + parseFloat(b.rate_per_hour), 0);
+
+    document.getElementById('profile-stats').innerHTML = `
+      <div class="stat-card"><div class="stat-value">${confirmed}</div><div class="stat-label">Active Bookings</div></div>
+      <div class="stat-card"><div class="stat-value">${cancelled}</div><div class="stat-label">Cancelled</div></div>
+      <div class="stat-card"><div class="stat-value">₹${totalSpent.toFixed(0)}</div><div class="stat-label">Total Spent</div></div>`;
+
+    state.walletBalance = balance;
+    updateNavBalance();
+  } catch {}
+}
+
+// ── ADMIN ─────────────────────────────────────────────────────
+function switchAdminTab(tab, e) {
   document.querySelectorAll('.admin-tabs .tab').forEach(t => t.classList.remove('active'));
-  event.target.classList.add('active');
+  e.target.classList.add('active');
   document.getElementById('admin-courts').classList.toggle('hidden', tab !== 'courts');
   document.getElementById('admin-bookings').classList.toggle('hidden', tab !== 'bookings');
   if (tab === 'bookings') loadAdminBookings();
 }
 
-async function loadAdmin() {
-  loadAdminCourts();
-}
+function loadAdmin() { loadAdminCourts(); }
 
 async function loadAdminCourts() {
   const list = document.getElementById('admin-courts-list');
@@ -377,6 +428,7 @@ async function loadAdminCourts() {
   try {
     const res = await authFetch(`${API}/admin/courts`);
     const courts = await res.json();
+    if (!courts.length) { list.innerHTML = '<p style="color:var(--muted)">No courts yet.</p>'; return; }
     list.innerHTML = courts.map(c => `
       <div class="admin-court-row">
         <div class="admin-court-info">
@@ -384,14 +436,11 @@ async function loadAdminCourts() {
           <p>📍 ${c.address} &nbsp;|&nbsp; ₹${c.rate_per_hour}/hr &nbsp;|&nbsp; ${c.status}</p>
         </div>
         <div class="admin-court-actions">
-          <button class="btn-edit" onclick="openCourtModal(${JSON.stringify(c).replace(/"/g, '&quot;')})">Edit</button>
+          <button class="btn-edit" onclick='openCourtModal(${JSON.stringify(c)})'>Edit</button>
           <button class="btn-danger" onclick="deleteCourt(${c.id})">Delete</button>
         </div>
-      </div>
-    `).join('') || '<p style="color:var(--muted)">No courts yet.</p>';
-  } catch {
-    list.innerHTML = '<p style="color:var(--danger)">Failed to load.</p>';
-  }
+      </div>`).join('');
+  } catch { list.innerHTML = '<p style="color:var(--danger)">Failed to load.</p>'; }
 }
 
 async function loadAdminBookings() {
@@ -400,18 +449,16 @@ async function loadAdminBookings() {
   try {
     const res = await authFetch(`${API}/admin/bookings`);
     const bookings = await res.json();
+    if (!bookings.length) { list.innerHTML = '<p style="color:var(--muted)">No bookings yet.</p>'; return; }
     list.innerHTML = bookings.map(b => `
       <div class="admin-booking-row">
         <div class="admin-booking-info">
           <strong>${b.court_name}</strong> (${b.sport})
-          <p style="color:var(--muted);margin-top:3px">User: ${b.username} &nbsp;|&nbsp; ${formatDate(b.date)} at ${b.time}</p>
+          <p style="color:var(--muted);margin-top:3px">👤 ${b.username} &nbsp;|&nbsp; 📅 ${formatDate(b.date)} at ${b.time}</p>
         </div>
         <span class="booking-status status-${b.status}">${b.status}</span>
-      </div>
-    `).join('') || '<p style="color:var(--muted)">No bookings yet.</p>';
-  } catch {
-    list.innerHTML = '<p style="color:var(--danger)">Failed to load.</p>';
-  }
+      </div>`).join('');
+  } catch { list.innerHTML = '<p style="color:var(--danger)">Failed to load.</p>'; }
 }
 
 function openCourtModal(court) {
@@ -426,23 +473,18 @@ function openCourtModal(court) {
     document.getElementById('modal-status').value = court.status;
   } else {
     document.getElementById('modal-title').textContent = 'Add Court';
-    document.getElementById('modal-court-id').value = '';
-    document.getElementById('modal-name').value = '';
+    ['modal-court-id','modal-name','modal-address','modal-rate'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('modal-sport').value = '';
-    document.getElementById('modal-address').value = '';
-    document.getElementById('modal-rate').value = '';
     document.getElementById('modal-status').value = 'available';
   }
   document.getElementById('court-modal').classList.remove('hidden');
 }
 
-function closeCourtModal() {
-  document.getElementById('court-modal').classList.add('hidden');
-}
+function closeCourtModal() { document.getElementById('court-modal').classList.add('hidden'); }
 
 async function saveCourt(e) {
   e.preventDefault();
-  const id = document.getElementById('modal-court-id').value;
+  const id   = document.getElementById('modal-court-id').value;
   const body = {
     name: document.getElementById('modal-name').value,
     sport: document.getElementById('modal-sport').value,
@@ -450,12 +492,9 @@ async function saveCourt(e) {
     rate_per_hour: document.getElementById('modal-rate').value,
     status: document.getElementById('modal-status').value,
   };
-
   try {
-    const url = id ? `${API}/admin/courts/${id}` : `${API}/admin/courts`;
-    const method = id ? 'PUT' : 'POST';
-    const res = await authFetch(url, {
-      method, headers: { 'Content-Type': 'application/json' },
+    const res = await authFetch(`${API}/admin/courts${id ? '/' + id : ''}`, {
+      method: id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
     const data = await res.json();
@@ -465,41 +504,35 @@ async function saveCourt(e) {
       return;
     }
     closeCourtModal();
+    toast(id ? 'Court updated.' : 'Court added.', 'success');
     loadAdminCourts();
     allCourts = [];
   } catch {
-    document.getElementById('modal-error').textContent = 'Failed to save court.';
+    document.getElementById('modal-error').textContent = 'Failed to save.';
     document.getElementById('modal-error').classList.remove('hidden');
   }
 }
 
 async function deleteCourt(id) {
-  if (!confirm('Delete this court? All associated bookings will also be deleted.')) return;
+  if (!confirm('Delete this court? All associated bookings will be removed.')) return;
   try {
     const res = await authFetch(`${API}/admin/courts/${id}`, { method: 'DELETE' });
-    if (!res.ok) return alert('Delete failed.');
+    if (!res.ok) { toast('Delete failed.', 'error'); return; }
+    toast('Court deleted.', 'success');
     loadAdminCourts();
     allCourts = [];
-  } catch {
-    alert('Delete failed.');
-  }
+  } catch { toast('Delete failed.', 'error'); }
 }
 
-// ─── HELPERS ─────────────────────────────────────────────────────────────────
-function authFetch(url, options = {}) {
-  return fetch(url, {
-    ...options,
-    headers: { ...options.headers, 'Authorization': `Bearer ${state.token}` }
-  });
+// ── HELPERS ───────────────────────────────────────────────────
+function authFetch(url, opts = {}) {
+  return fetch(url, { ...opts, headers: { ...opts.headers, 'Authorization': `Bearer ${state.token}` } });
 }
 
-function showError(id, msg) {
-  const el = document.getElementById(id);
-  el.textContent = msg;
-  el.classList.remove('hidden');
+function formatDate(d) {
+  return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-function formatDate(dateStr) {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+function formatDateTime(d) {
+  return new Date(d).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
