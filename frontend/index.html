@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Court Booking System</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <nav id="navbar" class="hidden">
+    <div class="nav-brand">CourtBook</div>
+    <div class="nav-links">
+      <a href="#" onclick="showPage('courts')">Courts</a>
+      <a href="#" onclick="showPage('my-bookings')">My Bookings</a>
+      <a href="#" onclick="showPage('wallet')">Wallet <span id="nav-balance"></span></a>
+      <a href="#" id="admin-link" class="hidden" onclick="showPage('admin')">Admin</a>
+      <a href="#" onclick="logout()" class="btn-logout">Logout</a>
+    </div>
+    <div class="nav-user">Hi, <span id="nav-username"></span></div>
+  </nav>
+
+  <!-- Auth Page -->
+  <div id="page-auth" class="page">
+    <div class="auth-container">
+      <div class="auth-box">
+        <h1>CourtBook</h1>
+        <p class="subtitle">Sports Court Booking System</p>
+        <div class="tab-row">
+          <button class="tab active" onclick="switchTab('login')">Login</button>
+          <button class="tab" onclick="switchTab('register')">Register</button>
+        </div>
+        <div id="auth-error" class="alert error hidden"></div>
+        <div id="auth-success" class="alert success hidden"></div>
+
+        <form id="login-form" onsubmit="login(event)">
+          <input type="text" id="login-username" placeholder="Username" required />
+          <input type="password" id="login-password" placeholder="Password" required />
+          <button type="submit" class="btn-primary">Login</button>
+        </form>
+
+        <form id="register-form" class="hidden" onsubmit="register(event)">
+          <input type="text" id="reg-username" placeholder="Username" required />
+          <input type="password" id="reg-password" placeholder="Password (min 6 chars)" required />
+          <button type="submit" class="btn-primary">Create Account</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Courts Page -->
+  <div id="page-courts" class="page hidden">
+    <div class="container">
+      <div class="page-header">
+        <h2>Available Courts</h2>
+        <div class="filters">
+          <select id="filter-sport" onchange="filterCourts()">
+            <option value="">All Sports</option>
+            <option value="Badminton">Badminton</option>
+            <option value="Tennis">Tennis</option>
+            <option value="Football">Football</option>
+            <option value="Basketball">Basketball</option>
+          </select>
+        </div>
+      </div>
+      <div id="courts-grid" class="courts-grid"></div>
+    </div>
+  </div>
+
+  <!-- Booking Page -->
+  <div id="page-booking" class="page hidden">
+    <div class="container">
+      <button class="btn-back" onclick="showPage('courts')">← Back to Courts</button>
+      <div id="court-detail"></div>
+      <div class="booking-section">
+        <h3>Select Date & Time</h3>
+        <div class="date-picker">
+          <label>Date</label>
+          <input type="date" id="booking-date" onchange="loadSlots()" />
+        </div>
+        <div id="slots-container" class="slots-container hidden">
+          <h4>Available Time Slots</h4>
+          <div id="slots-grid" class="slots-grid"></div>
+          <div id="booking-error" class="alert error hidden"></div>
+          <button class="btn-primary" id="confirm-btn" onclick="confirmBooking()" disabled>Confirm Booking</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- My Bookings Page -->
+  <div id="page-my-bookings" class="page hidden">
+    <div class="container">
+      <h2>My Bookings</h2>
+      <div id="bookings-list"></div>
+    </div>
+  </div>
+
+  <!-- Wallet Page -->
+  <div id="page-wallet" class="page hidden">
+    <div class="container wallet-container">
+      <h2>My Wallet</h2>
+      <div class="wallet-card">
+        <div class="wallet-label">Current Balance</div>
+        <div class="wallet-amount" id="wallet-balance">₹0.00</div>
+      </div>
+      <div class="add-money-box">
+        <h3>Add Money</h3>
+        <div class="quick-amounts">
+          <button onclick="setAmount(100)">₹100</button>
+          <button onclick="setAmount(200)">₹200</button>
+          <button onclick="setAmount(500)">₹500</button>
+          <button onclick="setAmount(1000)">₹1000</button>
+        </div>
+        <input type="number" id="wallet-amount" placeholder="Or enter custom amount" min="1" />
+        <div id="wallet-error" class="alert error hidden"></div>
+        <div id="wallet-success" class="alert success hidden"></div>
+        <button class="btn-primary" onclick="addMoney()">Add Money</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin Page -->
+  <div id="page-admin" class="page hidden">
+    <div class="container">
+      <h2>Admin Panel</h2>
+      <div class="admin-tabs">
+        <button class="tab active" onclick="switchAdminTab('courts')">Manage Courts</button>
+        <button class="tab" onclick="switchAdminTab('bookings')">All Bookings</button>
+      </div>
+
+      <div id="admin-courts">
+        <div class="admin-section-header">
+          <h3>Courts</h3>
+          <button class="btn-primary" onclick="openCourtModal()">+ Add Court</button>
+        </div>
+        <div id="admin-courts-list"></div>
+      </div>
+
+      <div id="admin-bookings" class="hidden">
+        <h3>All Bookings</h3>
+        <div id="admin-bookings-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Court Modal -->
+  <div id="court-modal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modal-title">Add Court</h3>
+        <button class="modal-close" onclick="closeCourtModal()">×</button>
+      </div>
+      <div id="modal-error" class="alert error hidden"></div>
+      <form onsubmit="saveCourt(event)">
+        <input type="hidden" id="modal-court-id" />
+        <label>Court Name</label>
+        <input type="text" id="modal-name" placeholder="e.g. Badminton Court A" required />
+        <label>Sport</label>
+        <select id="modal-sport" required>
+          <option value="">Select Sport</option>
+          <option value="Badminton">Badminton</option>
+          <option value="Tennis">Tennis</option>
+          <option value="Football">Football</option>
+          <option value="Basketball">Basketball</option>
+          <option value="Cricket">Cricket</option>
+          <option value="Volleyball">Volleyball</option>
+        </select>
+        <label>Address</label>
+        <input type="text" id="modal-address" placeholder="Location / Address" required />
+        <label>Rate per Hour (₹)</label>
+        <input type="number" id="modal-rate" placeholder="e.g. 200" min="1" required />
+        <label>Status</label>
+        <select id="modal-status">
+          <option value="available">Available</option>
+          <option value="unavailable">Unavailable</option>
+        </select>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" onclick="closeCourtModal()">Cancel</button>
+          <button type="submit" class="btn-primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

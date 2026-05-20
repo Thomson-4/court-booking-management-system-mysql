@@ -1,23 +1,8 @@
 # Court Booking and Management System
 
-A full-stack web application for booking and managing sports courts, built as a **DBMS Mini Project** at REVA University. The system allows users to register, browse courts, book time slots, and manage payments via an in-app wallet.
+A full-stack web application for booking and managing sports courts, built as a **DBMS Mini Project** at REVA University.
 
----
-
-## Features
-
-### User
-- Register and login with JWT-based authentication
-- Browse available sports courts (badminton, tennis, football, etc.)
-- Book a court by selecting date and time slot
-- Wallet system — add funds and pay for bookings automatically
-- Cancel bookings with automatic refund to wallet
-- View all personal bookings
-
-### Admin
-- Add, update, and manage court listings
-- Set hourly rates per court
-- Monitor all bookings across the platform
+Users can register, browse courts, book time slots, and manage payments via a built-in wallet. Admins can manage courts and view all bookings.
 
 ---
 
@@ -27,28 +12,9 @@ A full-stack web application for booking and managing sports courts, built as a 
 |-------|-----------|
 | Backend | Node.js, Express.js |
 | Database | MySQL |
+| Frontend | HTML, CSS, Vanilla JS |
 | Authentication | JSON Web Tokens (JWT) |
-| ORM / DB Driver | mysql2 |
-| Environment Config | dotenv |
-
----
-
-## Database Design
-
-### Entities & Tables
-
-| Table | Description |
-|-------|-------------|
-| `users` | Stores user credentials, role, and wallet balance |
-| `courts` | Court details — name, sport type, location, hourly rate |
-| `bookings` | Booking records linking users to courts with date, time, and status |
-
-### Key Concepts Applied
-- ER Modelling (see [`ER Diagram.png`](ER%20Diagram.png))
-- Normalization (up to 3NF)
-- Transactions with ROLLBACK for double-booking prevention
-- Row-level locking (`SELECT ... FOR UPDATE`) to handle concurrent bookings
-- Role-based access control (user / admin)
+| Password Hashing | bcryptjs |
 
 ---
 
@@ -56,28 +22,25 @@ A full-stack web application for booking and managing sports courts, built as a 
 
 ```
 court-booking-management-system-mysql/
-│
-├── app.js                        # Express server entry point
-├── package.json
-├── .env.example                  # Environment variable template
-│
-├── config/
-│   └── db.js                     # MySQL connection pool
-│
-├── middleware/
-│   └── auth.js                   # JWT authentication middleware
-│
-├── routes/
-│   ├── auth.js                   # Register & Login
-│   ├── courts.js                 # Court listing & details
-│   ├── bookings.js               # Book, cancel, view bookings
-│   ├── wallet.js                 # Wallet balance & top-up
-│   └── admin.js                  # Admin court management
-│
-├── migrations/
-│   └── add_wallet_balance.sql    # DB migration scripts
-│
-└── ER Diagram.png                # Entity-Relationship diagram
+├── backend/
+│   ├── app.js                  # Express server (serves API + frontend)
+│   ├── schema.sql              # Database schema (run this first)
+│   ├── seed.js                 # Seed admin user + sample courts
+│   ├── package.json
+│   ├── .env.example
+│   ├── config/db.js
+│   ├── middleware/auth.js
+│   └── routes/
+│       ├── auth.js
+│       ├── courts.js
+│       ├── bookings.js
+│       ├── wallet.js
+│       └── admin.js
+├── frontend/
+│   ├── index.html
+│   ├── style.css
+│   └── app.js
+└── ER Diagram.png
 ```
 
 ---
@@ -85,79 +48,112 @@ court-booking-management-system-mysql/
 ## Getting Started
 
 ### Prerequisites
-- Node.js (v16+)
-- MySQL (v8+)
+- Node.js v16+
+- MySQL v8+
 
-### Installation
-
-**1. Clone the repository**
+### 1. Clone the repository
 ```bash
 git clone https://github.com/Thomson-4/court-booking-management-system-mysql.git
 cd court-booking-management-system-mysql
 ```
 
-**2. Install dependencies**
+### 2. Set up the database
 ```bash
-npm install
+mysql -u root -p < backend/schema.sql
 ```
 
-**3. Set up environment variables**
+### 3. Configure environment variables
 ```bash
+cd backend
 cp .env.example .env
 ```
-Edit `.env` with your MySQL credentials and a secure JWT secret.
+Edit `.env` with your MySQL credentials:
+```
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=your_password
+DB_NAME=court_booking
+JWT_SECRET=pick_a_long_random_string
+PORT=5000
+```
 
-**4. Set up the database**
-```sql
-CREATE DATABASE court_booking;
-```
-Then run the migration script:
+### 4. Install dependencies & seed data
 ```bash
-mysql -u root -p court_booking < migrations/add_wallet_balance.sql
+npm install
+npm run seed
+```
+This creates an **admin user** and **5 sample courts**.
+
+### 5. Start the server
+```bash
+npm start
 ```
 
-**5. Start the server**
-```bash
-node app.js
-```
-Server runs on `http://localhost:5000`
+Open **http://localhost:5000** in your browser.
+
+---
+
+## Default Credentials
+
+| Role | Username | Password |
+|------|----------|----------|
+| Admin | `admin` | `admin123` |
+
+Register any new account for a regular user.
+
+---
+
+## Features
+
+### User
+- Register & login with hashed passwords (bcrypt)
+- Browse and filter courts by sport
+- Book courts by selecting date and time slot
+- Wallet — add funds, auto-deducted on booking
+- Cancel bookings with automatic refund
+
+### Admin
+- Add, edit, and delete courts
+- View all bookings across all users
 
 ---
 
 ## API Endpoints
 
 ### Auth
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/auth/register` | Register a new user |
-| POST | `/api/auth/login` | Login and receive JWT token |
+| Method | Endpoint | Auth |
+|--------|----------|------|
+| POST | `/api/auth/register` | No |
+| POST | `/api/auth/login` | No |
 
 ### Courts
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/courts` | Get all courts |
-| GET | `/api/courts/:id` | Get court by ID |
+| Method | Endpoint | Auth |
+|--------|----------|------|
+| GET | `/api/courts` | No |
+| GET | `/api/courts/:id` | No |
 
-### Bookings *(requires auth)*
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/bookings?courtId=&date=` | Get booked slots for a court |
-| POST | `/api/bookings` | Book a court slot |
-| GET | `/api/bookings/user/:userId` | Get user's bookings |
-| PATCH | `/api/bookings/:id/cancel` | Cancel a booking (auto-refund) |
+### Bookings
+| Method | Endpoint | Auth |
+|--------|----------|------|
+| GET | `/api/bookings?courtId=&date=` | User |
+| POST | `/api/bookings` | User |
+| GET | `/api/bookings/user/:userId` | User |
+| PATCH | `/api/bookings/:id/cancel` | User |
 
-### Wallet *(requires auth)*
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/wallet/balance` | Get wallet balance |
-| POST | `/api/wallet/add` | Add funds to wallet |
+### Wallet
+| Method | Endpoint | Auth |
+|--------|----------|------|
+| GET | `/api/wallet/balance` | User |
+| POST | `/api/wallet/add` | User |
 
-### Admin *(requires auth + admin role)*
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/admin/courts` | Add a new court |
-| PUT | `/api/admin/courts/:id` | Update court details |
-| DELETE | `/api/admin/courts/:id` | Delete a court |
+### Admin
+| Method | Endpoint | Auth |
+|--------|----------|------|
+| GET | `/api/admin/courts` | Admin |
+| POST | `/api/admin/courts` | Admin |
+| PUT | `/api/admin/courts/:id` | Admin |
+| DELETE | `/api/admin/courts/:id` | Admin |
+| GET | `/api/admin/bookings` | Admin |
 
 ---
 
