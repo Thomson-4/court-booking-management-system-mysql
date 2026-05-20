@@ -163,15 +163,6 @@ Register any new account for a regular user.
 
 ---
 
-## Academic Details
-
-- **Institution:** REVA University, Bengaluru
-- **Course:** DBMS Lab — B22EF0405
-- **Academic Year:** 2024–25
-- **Semester:** 4th
-
----
-
 ## Author
 
 **Thomson Sunny**  
